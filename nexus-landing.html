@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NEXUS — The Future of Spatial Computing</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'sans-serif'],
+          display: ['Space Grotesk', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+      }
+    }
+  }
+</script>
+
+<style>
+  :root {
+    --bg: #030712;
+    --bg-card: #0a0f1c;
+    --cyan: #22d3ee;
+    --violet: #8b5cf6;
+    --glow-cyan: rgba(34,211,238,0.35);
+    --glow-violet: rgba(139,92,246,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: auto; }
+
+  html.lenis, html.lenis body { height: auto; }
+  .lenis.lenis-smooth { scroll-behavior: auto !important; }
+  .lenis.lenis-stopped { overflow: hidden; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: #fff;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--cyan);
+    color: var(--bg);
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+  /* Loading Screen */
+  #loader {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    transition: opacity 1s ease, visibility 1s ease;
+  }
+  #loader.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .loader-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: 0.3em;
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    opacity: 0;
+    animation: loaderFadeIn 1s ease forwards;
+  }
+  .loader-bar-track {
+    width: 200px;
+    height: 2px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .loader-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--violet));
+    border-radius: 1px;
+    width: 0%;
+    animation: loadProgress 1.5s ease-in-out forwards;
+  }
+  @keyframes loadProgress {
+    0% { width: 0%; }
+    100% { width: 100%; }
+  }
+  @keyframes loaderFadeIn {
+    to { opacity: 1; }
+  }
+
+  /* Noise */
+  .noise {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    mix-blend-mode: overlay;
+  }
+
+  /* Cursor */
+  .cursor-dot, .cursor-outline {
+    position: fixed;
+    top: 0; left: 0;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    z-index: 9998;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  .cursor-dot {
+    width: 8px; height: 8px;
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--glow-cyan), 0 0 20px var(--glow-cyan);
+  }
+  .cursor-outline {
+    width: 40px; height: 40px;
+    border: 1px solid rgba(34,211,238,0.4);
+    transition: width 0.2s, height 0.2s, background 0.2s;
+  }
+  .cursor-outline.hover {
+    width: 60px; height: 60px;
+    background: rgba(34,211,238,0.08);
+    border-color: rgba(34,211,238,0.6);
+  }
+  @media (max-width: 768px) {
+    .cursor-dot, .cursor-outline { display: none; }
+  }
+
+  /* Canvas */
+  #canvas-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+  }
+  #canvas-container canvas { display: block; }
+
+  .content { position: relative; z-index: 10; }
+
+  /* Glass */
+  .glass {
+    background: rgba(3,7,18,0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* CTA */
+  .cta-glow {
+    position: relative;
+    display: inline-block;
+    padding: 18px 48px;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    color: var(--bg);
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    border-radius: 999px;
+    box-shadow: 0 0 30px var(--glow-cyan), 0 0 60px var(--glow-violet), inset 0 1px 0 rgba(255,255,255,0.2);
+    cursor: pointer;
+    border: none;
+    transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.4s ease;
+    text-decoration: none;
+    overflow: hidden;
+  }
+  .cta-glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    transform: translateX(-100%) skewX(-15deg);
+    transition: transform 0.6s ease;
+  }
+  .cta-glow:hover::before { transform: translateX(100%) skewX(-15deg); }
+  .cta-glow:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 0 50px var(--glow-cyan), 0 0 100px var(--glow-violet), 0 0 150px var(--glow-cyan), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .cta-glow:active {
+    transform: translateY(-1px) scale(0.98);
+  }
+
+  .magnetic { display: inline-block; position: relative; }
+
+  /* Headline chars */
+  .char-wrap {
+    display: inline-block;
+    overflow: hidden;
+    display: inline-flex;
+    vertical-align: bottom;
+  }
+  .char {
+    display: inline-block;
+    will-change: transform, opacity;
+  }
+
+  /* Horizontal showcase */
+  .horizontal-wrap { overflow: hidden; width: 100%; }
+  .horizontal-track {
+    display: flex;
+    gap: 2rem;
+    padding: 2rem 0;
+    width: max-content;
+  }
+
+  /* Product card */
+  .product-card {
+    width: 420px; height: 560px;
+    flex-shrink: 0;
+    border-radius: 28px;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(160deg, rgba(139,92,246,0.1), rgba(34,211,238,0.04));
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: border-color 0.5s ease, transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.5s ease;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+  .product-card:hover {
+    border-color: rgba(34,211,238,0.5);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), 0 0 40px rgba(34,211,238,0.15), 0 0 80px rgba(139,92,246,0.1);
+  }
+  .product-card .card-canvas {
+    width: 100%; height: 300px;
+    display: block;
+    background: radial-gradient(circle at center, rgba(139,92,246,0.15), transparent 70%);
+    transition: background 0.5s ease;
+  }
+  .product-card:hover .card-canvas {
+    background: radial-gradient(circle at center, rgba(139,92,246,0.25), rgba(34,211,238,0.1) 70%);
+  }
+
+  /* Feature card with 3D tilt */
+  .feature-card {
+    background: linear-gradient(160deg, rgba(139,92,246,0.08), rgba(34,211,238,0.03));
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 24px;
+    padding: 2.5rem;
+    height: 100%;
+    transition: border-color 0.5s, transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.5s;
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+  }
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle at center, rgba(34,211,238,0.06), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-card:hover {
+    border-color: rgba(34,211,238,0.4);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(34,211,238,0.1);
+  }
+
+  /* Nav */
+  .nav-link {
+    position: relative;
+    padding: 4px 0;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    transition: color 0.3s;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 0; height: 1px;
+    background: var(--cyan);
+    transition: width 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  .nav-link:hover { color: #fff; }
+  .nav-link:hover::after { width: 100%; }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(34,211,238,0.3), rgba(139,92,246,0.3), transparent);
+  }
+
+  /* Mobile */
+  .mobile-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(3,7,18,0.95);
+    backdrop-filter: blur(20px);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  .mobile-menu.open { opacity: 1; visibility: visible; }
+  .mobile-menu a {
+    font-size: 1.5rem;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: color 0.3s;
+  }
+  .mobile-menu a:hover { color: var(--cyan); }
+
+  .stat-number {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  /* Scroll indicator */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.6;
+    animation: bounce 2s infinite;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(10px); }
+  }
+  .scroll-indicator .mouse {
+    width: 24px; height: 38px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 12px;
+    position: relative;
+  }
+  .scroll-indicator .mouse::before {
+    content: '';
+    position: absolute;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    width: 3px; height: 6px;
+    background: #fff;
+    border-radius: 2px;
+    animation: scrollDot 1.5s infinite;
+  }
+  @keyframes scrollDot {
+    0% { opacity: 1; top: 6px; }
+    100% { opacity: 0; top: 18px; }
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--cyan), var(--violet));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Metric bars */
+  .metric-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .metric-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--violet));
+    border-radius: 2px;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 1.5s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+
+  .reveal-up { opacity: 0; transform: translateY(40px); }
+  .reveal-fade { opacity: 0; }
+
+  /* Showcase nav */
+  .showcase-nav {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+  .showcase-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .showcase-dot.active {
+    background: var(--cyan);
+    box-shadow: 0 0 10px var(--glow-cyan);
+  }
+
+  /* Waitlist */
+  .waitlist-input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 999px;
+    padding: 14px 24px;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: all 0.3s;
+    min-width: 280px;
+  }
+  .waitlist-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px rgba(34,211,238,0.2);
+  }
+  .waitlist-input::placeholder { color: rgba(255,255,255,0.3); }
+
+  /* Scroll to top */
+  .scroll-top {
+    position: fixed;
+    bottom: 2rem; right: 2rem;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: rgba(3,7,18,0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 50;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
+  }
+  .scroll-top.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+  .scroll-top:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 20px var(--glow-cyan);
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    .product-card { width: 300px; height: 440px; }
+    .product-card .card-canvas { height: 220px; }
+  }
+</style>
+</head>
+
+<body>
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-logo">NEXUS</div>
+    <div class="loader-bar-track">
+      <div class="loader-bar"></div>
+    </div>
+  </div>
+
+  <!-- Noise -->
+  <div class="noise"></div>
+
+  <!-- Cursor -->
+  <div class="cursor-dot" id="cursor-dot"></div>
+  <div class="cursor-outline" id="cursor-outline"></div>
+
+  <!-- Three.js Background -->
+  <div id="canvas-container"></div>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" id="mobile-menu">
+    <a href="#features" onclick="closeMobileMenu()">Features</a>
+    <a href="#showcase" onclick="closeMobileMenu()">Showcase</a>
+    <a href="#about" onclick="closeMobileMenu()">Performance</a>
+    <a href="#contact" onclick="closeMobileMenu()">Contact</a>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 w-full z-50 px-4 pt-4">
+    <div class="glass rounded-full px-6 py-3.5 flex items-center justify-between max-w-7xl mx-auto">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <span class="text-void font-bold text-sm">N</span>
+        </div>
+        <span class="font-display font-bold text-lg tracking-wide">NEXUS</span>
+      </div>
+      <div class="hidden md:flex items-center gap-8 text-sm font-medium">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#showcase" class="nav-link">Showcase</a>
+        <a href="#about" class="nav-link">Performance</a>
+        <a href="#contact" class="nav-link">Contact</a>
+      </div>
+      <div class="hidden md:block">
+        <a href="#waitlist" class="cta-glow text-sm py-3 px-6">Get Early Access</a>
+      </div>
+      <button class="md:hidden text-white text-xl w-10 h-10 flex items-center justify-center" onclick="toggleMobileMenu()">☰</button>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Hero Section -->
+    <section id="hero" class="relative min-h-screen flex items-center justify-center px-6 pt-24 pb-32">
+      <div class="max-w-7xl mx-auto text-center relative z-10">
+        <div class="mb-8 inline-flex items-center gap-2 glass px-5 py-2.5 rounded-full text-xs font-mono text-cyan-400 tracking-widest reveal-fade">
+          <span class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+          SPATIAL COMPUTING REIMAGINED
+        </div>
+
+        <h1 id="hero-headline" class="font-display font-black text-5xl sm:text-7xl md:text-8xl lg:text-[9rem] leading-[0.9] tracking-tighter mb-8">
+          The Future of Spatial Computing
+        </h1>
+
+        <p id="hero-sub" class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-12 leading-relaxed reveal-fade">
+          Experience the next evolution of immersive technology. Seamlessly blending the physical and digital worlds through cutting-edge spatial interfaces.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 reveal-fade" id="hero-cta">
+          <div class="magnetic">
+            <a href="#showcase" class="cta-glow">Explore The Vision</a>
+          </div>
+          <a href="#features" class="px-8 py-4 rounded-full border border-white/10 text-white/80 hover:text-white hover:border-white/30 hover:bg-white/5 transition font-medium text-sm">
+            Learn More
+          </a>
+        </div>
+      </div>
+
+      <div class="scroll-indicator">
+        <div class="mouse"></div>
+        <span class="text-xs text-gray-500 tracking-widest">SCROLL</span>
+      </div>
+    </section>
+
+    <!-- Scroll-Triggered Features -->
+    <section id="features" class="py-32 px-6">
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-20 reveal-up">
+          <h2 class="font-display font-bold text-4xl md:text-6xl mb-4">
+            <span class="gradient-text">Redefining Boundaries</span>
+          </h2>
+          <p class="text-gray-400 max-w-2xl mx-auto text-lg">
+            Three pillars of the Nexus ecosystem, engineered for tomorrow.
+          </p>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6">
+          <div class="feature-card gs-reveal" data-tilt>
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-cyan-500/5 flex items-center justify-center mb-6 border border-cyan-400/20 relative z-10">
+              <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="font-display font-bold text-2xl mb-3 relative z-10">Neural Rendering</h3>
+            <p class="text-gray-400 leading-relaxed relative z-10">Real-time ray tracing powered by adaptive neural networks. Photorealistic environments generated at 120 frames per second with zero latency.</p>
+          </div>
+          <div class="feature-card gs-reveal" data-tilt>
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-400/20 to-violet-500/5 flex items-center justify-center mb-6 border border-violet-400/20 relative z-10">
+              <svg class="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+            </div>
+            <h3 class="font-display font-bold text-2xl mb-3 relative z-10">Quantum Sync</h3>
+            <p class="text-gray-400 leading-relaxed relative z-10">Multi-user spatial anchoring with quantum-encrypted position sharing. Collaborate across continents as if standing in the same room.</p>
+          </div>
+          <div class="feature-card gs-reveal" data-tilt>
+            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-violet-500/10 flex items-center justify-center mb-6 border border-cyan-400/20 relative z-10">
+              <svg class="w-7 h-7 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+            </div>
+            <h3 class="font-display font-bold text-2xl mb-3 relative z-10">Holographic UI</h3>
+            <p class="text-gray-400 leading-relaxed relative z-10">Gaze-driven interfaces that adapt to your focus. Contextual information layers that dissolve into the physical environment naturally.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Horizontal Product Showcase -->
+    <section id="showcase" class="py-32">
+      <div class="px-6 mb-16">
+        <div class="max-w-7xl mx-auto text-center reveal-up">
+          <h2 class="font-display font-bold text-4xl md:text-6xl mb-4">
+            <span class="gradient-text">Product Timeline</span>
+          </h2>
+          <p class="text-gray-400 max-w-xl mx-auto">Four generations of spatial innovation.</p>
+        </div>
+      </div>
+      <div class="horizontal-wrap" id="horizontal-container">
+        <div class="horizontal-track pl-6 md:pl-12" id="horizontal-track">
+
+          <div class="product-card">
+            <canvas class="card-canvas" data-card="1"></canvas>
+            <div class="p-6 relative z-10">
+              <span class="text-xs font-mono text-cyan-400 tracking-widest">2024 — GEN 1</span>
+              <h3 class="font-display font-bold text-2xl mt-1 mb-2">Nexus Core</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">The first spatial workstation. Room-scale tracking with 8K per eye resolution and haptic glove integration.</p>
+            </div>
+          </div>
+
+          <div class="product-card">
+            <canvas class="card-canvas" data-card="2"></canvas>
+            <div class="p-6 relative z-10">
+              <span class="text-xs font-mono text-violet-400 tracking-widest">2025 — GEN 2</span>
+              <h3 class="font-display font-bold text-2xl mt-1 mb-2">Nexus Link</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">Seamless cross-reality bridging. Switch between VR, AR, and holographic projections with a neural gesture.</p>
+            </div>
+          </div>
+
+          <div class="product-card">
+            <canvas class="card-canvas" data-card="3"></canvas>
+            <div class="p-6 relative z-10">
+              <span class="text-xs font-mono text-cyan-400 tracking-widest">2026 — GEN 3</span>
+              <h3 class="font-display font-bold text-2xl mt-1 mb-2">Nexus Orbit</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">Cloud-native spatial computing. Access infinite compute from anywhere on any device via neural mesh network.</p>
+            </div>
+          </div>
+
+          <div class="product-card">
+            <canvas class="card-canvas" data-card="4"></canvas>
+            <div class="p-6 relative z-10">
+              <span class="text-xs font-mono text-violet-400 tracking-widest">2027 — GEN 4</span>
+              <h3 class="font-display font-bold text-2xl mt-1 mb-2">Nexus Genesis</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">Full neural integration. Direct brain-to-reality interface with zero perceptible latency and sensory expansion.</p>
+            </div>
+          </div>
+
+          <div class="product-card">
+            <canvas class="card-canvas" data-card="5"></canvas>
+            <div class="p-6 relative z-10">
+              <span class="text-xs font-mono text-cyan-400 tracking-widest">2028 — GEN 5</span>
+              <h3 class="font-display font-bold text-2xl mt-1 mb-2">Nexus Singularity</h3>
+              <p class="text-gray-400 text-sm leading-relaxed">Ambient spatial intelligence that anticipates intent. Reality augmentation that is indistinguishable from physical truth.</p>
+            </div>
+          </div>
+
+        </div>
+        <div class="showcase-nav" id="showcase-nav">
+          <div class="showcase-dot active" data-index="0"></div>
+          <div class="showcase-dot" data-index="1"></div>
+          <div class="showcase-dot" data-index="2"></div>
+          <div class="showcase-dot" data-index="3"></div>
+          <div class="showcase-dot" data-index="4"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- About / Performance -->
+    <section id="about" class="py-32 px-6">
+      <div class="max-w-7xl mx-auto">
+        <div class="grid md:grid-cols-2 gap-16 items-center">
+          <div class="reveal-up">
+            <h2 class="font-display font-bold text-4xl md:text-6xl mb-6 leading-tight">
+              Engineered for<br/>
+              <span class="gradient-text">Performance</span>
+            </h2>
+            <p class="text-gray-400 leading-relaxed mb-8 text-lg">
+              Every Nexus device runs on purpose-built silicon that delivers desktop-class performance in an ultra-light form factor. With a custom 5nm architecture optimized for spatial workloads, the system sustains 60fps across multi-display projections without thermal throttling.
+            </p>
+            <div class="flex flex-col gap-6 mt-10">
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm text-gray-400 font-mono">FRAME RATE</span>
+                  <span class="text-sm text-cyan-400 font-mono stat-number" data-count="60">0</span>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" data-width="98"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm text-gray-400 font-mono">RESOLUTION</span>
+                  <span class="text-sm text-cyan-400 font-mono">8K PER EYE</span>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" data-width="95"></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-sm text-gray-400 font-mono">FIELD OF VIEW</span>
+                  <span class="text-sm text-cyan-400 font-mono stat-number" data-count="120">0</span>
+                </div>
+                <div class="metric-bar"><div class="metric-fill" data-width="92"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="relative reveal-up">
+            <div class="aspect-square rounded-3xl border border-white/6 bg-gradient-to-br from-cyan-500/5 to-violet-500/5 flex items-center justify-center relative overflow-hidden">
+              <canvas id="about-orb" class="w-full h-full"></canvas>
+              <div class="absolute inset-0 bg-gradient-to-t from-void via-transparent to-transparent z-10"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Waitlist -->
+    <section id="waitlist" class="py-32 px-6">
+      <div class="max-w-3xl mx-auto text-center reveal-up">
+        <h2 class="font-display font-bold text-4xl md:text-6xl mb-4">
+          <span class="gradient-text">Join the Waitlist</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-10 max-w-xl mx-auto">Be the first to experience the future of spatial computing. Early access opens Q2 2027.</p>
+        <form class="flex flex-col sm:flex-row items-center justify-center gap-3" onsubmit="handleWaitlist(event)">
+          <input type="email" class="waitlist-input" placeholder="Enter your email" required />
+          <button type="submit" class="cta-glow whitespace-nowrap">Reserve Your Spot</button>
+        </form>
+        <p class="text-gray-500 text-sm mt-4">No spam. Unsubscribe anytime.</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer id="contact" class="py-20 px-6">
+      <div class="max-w-7xl mx-auto">
+        <div class="grid md:grid-cols-4 gap-12 mb-16">
+          <div class="md:col-span-2">
+            <div class="flex items-center gap-2.5 mb-4">
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-violet-500 flex items-center justify-center">
+                <span class="text-void font-bold text-sm">N</span>
+              </div>
+              <span class="font-display font-bold text-xl tracking-wide">NEXUS</span>
+            </div>
+            <p class="text-gray-400 max-w-sm leading-relaxed">Building the future of spatial computing. Join the revolution.</p>
+          </div>
+          <div>
+            <h4 class="font-display font-bold text-sm tracking-widest mb-4 text-gray-300">PRODUCT</h4>
+            <div class="flex flex-col gap-2 text-sm text-gray-400">
+              <a href="#" class="hover:text-cyan-400 transition">Nexus Core</a>
+              <a href="#" class="hover:text-cyan-400 transition">Nexus Link</a>
+              <a href="#" class="hover:text-cyan-400 transition">Nexus Orbit</a>
+              <a href="#" class="hover:text-cyan-400 transition">Nexus Genesis</a>
+            </div>
+          </div>
+          <div>
+            <h4 class="font-display font-bold text-sm tracking-widest mb-4 text-gray-300">COMPANY</h4>
+            <div class="flex flex-col gap-2 text-sm text-gray-400">
+              <a href="#" class="hover:text-cyan-400 transition">About</a>
+              <a href="#" class="hover:text-cyan-400 transition">Careers</a>
+              <a href="#" class="hover:text-cyan-400 transition">Privacy</a>
+              <a href="#" class="hover:text-cyan-400 transition">Terms</a>
+            </div>
+          </div>
+        </div>
+        <div class="border-t border-white/5 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p class="text-gray-500 text-sm">© 2026 Nexus Technologies. The future is spatial.</p>
+          <div class="flex gap-6">
+            <a href="#" class="text-gray-500 hover:text-cyan-400 transition text-sm">Privacy</a>
+            <a href="#" class="text-gray-500 hover:text-cyan-400 transition text-sm">Terms</a>
+            <a href="#" class="text-gray-500 hover:text-cyan-400 transition text-sm">Contact</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Scroll to top -->
+  <button class="scroll-top" id="scroll-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+  </button>
+
+  <!-- Lenis -->
+  <script src="https://unpkg.com/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+
+  <script>
+    // =========================================
+    // LOADER
+    // =========================================
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loader').classList.add('hidden');
+        initAnimations();
+      }, 1800);
+    });
+
+    // =========================================
+    // LENIS
+    // =========================================
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smooth: true,
+    });
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((time) => { lenis.raf(time * 1000); });
+    gsap.ticker.lagSmoothing(0);
+
+    // =========================================
+    // CURSOR
+    // =========================================
+    const cursorDot = document.getElementById('cursor-dot');
+    const cursorOutline = document.getElementById('cursor-outline');
+    let cursorX = 0, cursorY = 0;
+    let outlineX = 0, outlineY = 0;
+
+    window.addEventListener('mousemove', (e) => {
+      cursorX = e.clientX;
+      cursorY = e.clientY;
+      cursorDot.style.left = cursorX + 'px';
+      cursorDot.style.top = cursorY + 'px';
+    });
+
+    function animateCursor() {
+      outlineX += (cursorX - outlineX) * 0.15;
+      outlineY += (cursorY - outlineY) * 0.15;
+      cursorOutline.style.left = outlineX + 'px';
+      cursorOutline.style.top = outlineY + 'px';
+      requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    document.querySelectorAll('a, button, .product-card, .feature-card, .cta-glow').forEach(el => {
+      el.addEventListener('mouseenter', () => cursorOutline.classList.add('hover'));
+      el.addEventListener('mouseleave', () => cursorOutline.classList.remove('hover'));
+    });
+
+    // =========================================
+    // MOBILE MENU
+    // =========================================
+    function toggleMobileMenu() { document.getElementById('mobile-menu').classList.toggle('open'); }
+    function closeMobileMenu() { document.getElementById('mobile-menu').classList.remove('open'); }
+
+    // =========================================
+    // THREE.JS BACKGROUND
+    // =========================================
+    (function() {
+      const container = document.getElementById('canvas-container');
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 4;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      container.appendChild(renderer.domElement);
+
+      // Orb
+      const orbGeom = new THREE.IcosahedronGeometry(1.3, 4);
+      const orbMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: { value: 0 },
+          uColor1: { value: new THREE.Color('#22d3ee') },
+          uColor2: { value: new THREE.Color('#8b5cf6') },
+        },
+        vertexShader: `
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          uniform float uTime;
+          void main() {
+            vec3 p = position;
+            p += normal * sin(p.y * 3.0 + uTime * 0.8) * 0.05;
+            vPosition = p;
+            vNormal = normal;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          uniform vec3 uColor1;
+          uniform vec3 uColor2;
+          uniform float uTime;
+          void main() {
+            float fresnel = pow(1.0 - abs(dot(vNormal, vec3(0.0,0.0,1.0))), 2.5);
+            vec3 col = mix(uColor1, uColor2, fresnel + sin(uTime*0.5)*0.2);
+            float alpha = fresnel * 0.6 + 0.1;
+            gl_FragColor = vec4(col, alpha);
+          }
+        `,
+        transparent: true,
+        depthWrite: false,
+      });
+      const orb = new THREE.Mesh(orbGeom, orbMat);
+      orb.position.set(2.2, 0.3, -1);
+      scene.add(orb);
+
+      // Particles
+      const particleCount = 2000;
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+      const sizes = new Float32Array(particleCount);
+      for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        positions[i3] = (Math.random() - 0.5) * 16;
+        positions[i3 + 1] = (Math.random() - 0.5) * 10;
+        positions[i3 + 2] = (Math.random() - 0.5) * 10 - 2;
+        const isCyan = Math.random() > 0.5;
+        colors[i3] = isCyan ? 0.13 : 0.55;
+        colors[i3 + 1] = isCyan ? 0.83 : 0.36;
+        colors[i3 + 2] = isCyan ? 0.93 : 0.96;
+        sizes[i] = Math.random() * 2.5 + 0.5;
+      }
+      const pGeom = new THREE.BufferGeometry();
+      pGeom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      pGeom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      pGeom.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+      const pMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: `
+          attribute float size;
+          varying vec3 vColor;
+          uniform float uTime;
+          void main() {
+            vColor = color;
+            vec3 p = position;
+            p.y += sin(uTime * 0.3 + position.x * 0.5) * 0.2;
+            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+            gl_PointSize = size * (150.0 / -mv.z);
+            gl_Position = projectionMatrix * mv;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vColor;
+          void main() {
+            float d = length(gl_PointCoord - 0.5);
+            if (d > 0.5) discard;
+            float a = smoothstep(0.5, 0.1, d) * 0.7;
+            gl_FragColor = vec4(vColor, a);
+          }
+        `,
+        transparent: true,
+        vertexColors: true,
+        depthWrite: false,
+      });
+      const particles = new THREE.Points(pGeom, pMat);
+      scene.add(particles);
+
+      let mx = 0, my = 0;
+      window.addEventListener('mousemove', (e) => {
+        mx = (e.clientX / window.innerWidth - 0.5) * 2;
+        my = (e.clientY / window.innerHeight - 0.5) * 2;
+      });
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const t = clock.getElapsedTime();
+        orbMat.uniforms.uTime.value = t;
+        pMat.uniforms.uTime.value = t;
+        orb.rotation.y += 0.004;
+        orb.rotation.x += 0.002;
+        camera.position.x += (mx * 0.5 - camera.position.x) * 0.03;
+        camera.position.y += (-my * 0.3 - camera.position.y) * 0.03;
+        camera.lookAt(scene.position);
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // =========================================
+    // HERO HEADLINE
+    // =========================================
+    (function() {
+      const headline = document.getElementById('hero-headline');
+      const text = headline.textContent.trim();
+      headline.textContent = '';
+      headline.style.opacity = '1';
+      const words = text.split(' ');
+      words.forEach((word, wi) => {
+        word.split('').forEach((ch) => {
+          const wrap = document.createElement('span');
+          wrap.className = 'char-wrap';
+          const inner = document.createElement('span');
+          inner.className = 'char';
+          inner.textContent = ch === ' ' ? '\u00A0' : ch;
+          wrap.appendChild(inner);
+          headline.appendChild(wrap);
+        });
+        if (wi < words.length - 1) {
+          const space = document.createElement('span');
+          space.innerHTML = '&nbsp;';
+          headline.appendChild(space);
+        }
+      });
+
+      gsap.fromTo('.char',
+        { opacity: 0, y: 80, rotateX: -60, scale: 0.8 },
+        { opacity: 1, y: 0, rotateX: 0, scale: 1, duration: 1.4, ease: 'power4.out', stagger: 0.04 }
+      );
+    })();
+
+    // =========================================
+    // HERO FADE ON SCROLL
+    // =========================================
+    (function() {
+      const chars = document.querySelectorAll('.char');
+      const sub = document.getElementById('hero-sub');
+      const cta = document.getElementById('hero-cta');
+
+      gsap.to(chars, {
+        scrollTrigger: { trigger: '#features', start: 'top bottom', end: 'top top', scrub: 1 },
+        opacity: 0, y: -50, stagger: 0.015, filter: 'blur(4px)',
+      });
+      gsap.to([sub, cta], {
+        scrollTrigger: { trigger: '#features', start: 'top bottom', end: 'top top', scrub: 1 },
+        opacity: 0, y: -30, filter: 'blur(3px)',
+      });
+    })();
+
+    // =========================================
+    // FEATURE CARDS
+    // =========================================
+    gsap.registerPlugin(ScrollTrigger);
+
+    gsap.utils.toArray('.gs-reveal').forEach((el, i) => {
+      gsap.fromTo(el,
+        { opacity: 0, y: 80 },
+        {
+          opacity: 1, y: 0,
+          duration: 1.2,
+          ease: 'power4.out',
+          scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none none' },
+          delay: i % 3 * 0.2,
+        }
+      );
+    });
+
+    // =========================================
+    // 3D TILT ON FEATURE CARDS
+    // =========================================
+    (function() {
+      document.querySelectorAll('[data-tilt]').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+          const r = card.getBoundingClientRect();
+          const x = e.clientX - r.left;
+          const y = e.clientY - r.top;
+          const centerX = r.width / 2;
+          const centerY = r.height / 2;
+          const rotateX = ((y - centerY) / centerY) * -5;
+          const rotateY = ((x - centerX) / centerX) * 5;
+          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-10px)`;
+        });
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateY(0)';
+        });
+      });
+    })();
+
+    // =========================================
+    // HORIZONTAL SHOWCASE
+    // =========================================
+    (function() {
+      const container = document.getElementById('horizontal-container');
+      const track = document.getElementById('horizontal-track');
+      const dots = document.querySelectorAll('.showcase-dot');
+      if (!container || !track) return;
+
+      const getScrollAmount = () => -(track.scrollWidth - window.innerWidth + 60);
+      const tween = gsap.to(track, {
+        x: getScrollAmount,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: '#showcase',
+          start: 'top top',
+          end: () => `+=${Math.abs(getScrollAmount())}`,
+          pin: true,
+          scrub: 1,
+          invalidateOnRefresh: true,
+        },
+      });
+
+      // Update dots on scroll
+      ScrollTrigger.create({
+        trigger: '#showcase',
+        start: 'top top',
+        end: () => `+=${Math.abs(getScrollAmount())}`,
+        onUpdate: (self) => {
+          const progress = self.progress;
+          const totalCards = 5;
+          const activeIndex = Math.min(Math.floor(progress * totalCards + 0.5), totalCards - 1);
+          dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === activeIndex);
+          });
+        }
+      });
+
+      // Dot click navigation
+      dots.forEach(dot => {
+        dot.addEventListener('click', () => {
+          const index = parseInt(dot.getAttribute('data-index'));
+          const cardWidth = 420 + 32; // card width + gap
+          const scrollTarget = index * cardWidth;
+          lenis.scrollTo(`#showcase`, { offset: 0 });
+          gsap.to(track, { x: -scrollTarget, duration: 1, ease: 'power3.inOut' });
+        });
+      });
+    })();
+
+    // =========================================
+    // PRODUCT CARDS — Mini Three.js Orbs
+    // =========================================
+    (function() {
+      const canvases = document.querySelectorAll('.card-canvas[data-card]');
+      canvases.forEach((canvas, idx) => {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, canvas.clientWidth / canvas.clientHeight, 0.1, 100);
+        camera.position.z = 3;
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+
+        const isCyan = idx % 2 === 0;
+        const colorHex = isCyan ? '#22d3ee' : '#8b5cf6';
+        const geom = new THREE.IcosahedronGeometry(0.8, 2);
+        const mat = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(colorHex),
+          wireframe: true,
+          transparent: true,
+          opacity: 0.5,
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        scene.add(mesh);
+
+        const inner = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(0.5, 1),
+          new THREE.MeshBasicMaterial({ color: new THREE.Color(colorHex), transparent: true, opacity: 0.15 })
+        );
+        scene.add(inner);
+
+        const n = 80;
+        const pos = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          const th = Math.random() * Math.PI * 2;
+          const ph = Math.random() * Math.PI;
+          const r = 1.0 + Math.random() * 0.4;
+          pos[i*3] = r * Math.sin(ph) * Math.cos(th);
+          pos[i*3+1] = r * Math.sin(ph) * Math.sin(th);
+          pos[i*3+2] = r * Math.cos(ph);
+        }
+        const pGeom = new THREE.BufferGeometry();
+        pGeom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const pMat = new THREE.PointsMaterial({ color: new THREE.Color(colorHex), size: 0.03, transparent: true, opacity: 0.8 });
+        const pts = new THREE.Points(pGeom, pMat);
+        scene.add(pts);
+
+        function resize() {
+          const w = canvas.clientWidth, h = canvas.clientHeight;
+          camera.aspect = w / Math.max(h, 1);
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+        new ResizeObserver(resize).observe(canvas);
+        resize();
+
+        let mx = 0, my = 0;
+        canvas.addEventListener('mousemove', (e) => {
+          const r = canvas.getBoundingClientRect();
+          mx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+          my = ((e.clientY - r.top) / r.height - 0.5) * 2;
+        });
+
+        function animate() {
+          requestAnimationFrame(animate);
+          mesh.rotation.y += 0.006;
+          mesh.rotation.x += 0.003;
+          inner.rotation.y -= 0.008;
+          pts.rotation.y += 0.004;
+          mesh.rotation.y += mx * 0.02;
+          mesh.rotation.x += my * 0.02;
+          renderer.render(scene, camera);
+        }
+        animate();
+      });
+    })();
+
+    // =========================================
+    // ABOUT ORB
+    // =========================================
+    (function() {
+      const canvas = document.getElementById('about-orb');
+      if (!canvas) return;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+      camera.position.z = 3;
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const geom = new THREE.TorusKnotGeometry(0.9, 0.3, 180, 24);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x22d3ee, wireframe: true, transparent: true, opacity: 0.4 });
+      const mesh = new THREE.Mesh(geom, mat);
+      scene.add(mesh);
+
+      const glow = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.9, 0.3, 180, 24),
+        new THREE.MeshBasicMaterial({ color: 0x8b5cf6, transparent: true, opacity: 0.08 })
+      );
+      scene.add(glow);
+
+      function resize() {
+        const w = canvas.clientWidth, h = canvas.clientHeight;
+        camera.aspect = w / Math.max(h, 1);
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+      new ResizeObserver(resize).observe(canvas);
+      resize();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        mesh.rotation.x += 0.004;
+        mesh.rotation.y += 0.006;
+        glow.rotation.x -= 0.003;
+        glow.rotation.y -= 0.005;
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // =========================================
+    // ANIMATED COUNTERS
+    // =========================================
+    (function() {
+      const counters = document.querySelectorAll('[data-count]');
+      counters.forEach(counter => {
+        const target = parseInt(counter.getAttribute('data-count'));
+        gsap.fromTo(counter,
+          { textContent: 0 },
+          {
+            textContent: target,
+            duration: 2.5,
+            ease: 'power2.out',
+            scrollTrigger: { trigger: counter, start: 'top 85%', toggleActions: 'play none none none' },
+            snap: { textContent: 1 },
+            onUpdate: function() {
+              counter.textContent = Math.floor(this.targets()[0].textContent);
+            }
+          }
+        );
+      });
+    })();
+
+    // =========================================
+    // METRIC BARS
+    // =========================================
+    (function() {
+      document.querySelectorAll('.metric-fill').forEach(bar => {
+        const width = bar.getAttribute('data-width');
+        gsap.to(bar, {
+          scaleX: width / 100,
+          duration: 1.5,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: bar, start: 'top 90%', toggleActions: 'play none none none' },
+        });
+      });
+    })();
+
+    // =========================================
+    // REVEAL ON SCROLL
+    // =========================================
+    (function() {
+      document.querySelectorAll('.reveal-up, .reveal-fade').forEach(el => {
+        gsap.fromTo(el,
+          { opacity: 0, y: 40 },
+          {
+            opacity: 1, y: 0,
+            duration: 1,
+            ease: 'power3.out',
+            scrollTrigger: { trigger: el, start: 'top 88%', toggleActions: 'play none none none' }
+          }
+        );
+      });
+    })();
+
+    // =========================================
+    // SCROLL TO TOP
+    // =========================================
+    const scrollTopBtn = document.getElementById('scroll-top');
+    window.addEventListener('scroll', () => {
+      scrollTopBtn.classList.toggle('visible', window.scrollY > 500);
+    });
+
+    // =========================================
+    // WAITLIST
+    // =========================================
+    function handleWaitlist(e) {
+      e.preventDefault();
+      const input = e.target.querySelector('input');
+      const btn = e.target.querySelector('button');
+      const originalText = btn.textContent;
+      btn.textContent = '✓ Reserved!';
+      btn.style.background = 'linear-gradient(135deg, #10b981, #22d3ee)';
+      input.value = '';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.background = '';
+      }, 3000);
+    }
+
+    // =========================================
+    // INIT
+    // =========================================
+    function initAnimations() {
+      ScrollTrigger.refresh();
+    }
+  </script>
+</body>
+</html>
