@@ -49,17 +49,15 @@ npx serve .
 python -m http.server 8000
 ```
 
-Lalu buka: `http://localhost:8000/nexus-landing.html`
+Lalu buka: `http://localhost:8000/`
 
 ### Live Demo (GitHub Pages)
 
 Aktifkan di: `Settings → Pages → Deploy from branch → main / (root)` → akses di:
 
 ```
-https://rizqybelajar8-commits.github.io/3d-site-by-step-AI/nexus-landing.html
+https://rizqybelajar8-commits.github.io/3d-site-by-step-AI/
 ```
-
-> Tips: rename/copy `nexus-landing.html` jadi `index.html` supaya jadi halaman utama otomatis. Lihat [bagian Deploy](#-deploy).
 
 ---
 
@@ -107,7 +105,8 @@ Tidak ada `package.json`, tidak ada bundler. **Clone → buka → jadi.**
 
 ```
 3d-site-by-step-AI/
-├── nexus-landing.html   # ← seluruh app (HTML + CSS + JS dalam 1 file, ~1350 baris)
+├── index.html           # ← entry point utama (untuk GitHub Pages)
+├── nexus-landing.html   # ← file sumber asli (isi sama dengan index.html)
 └── README.md            # dokumentasi ini
 ```
 
@@ -151,7 +150,7 @@ python -m http.server 8000
 php -S localhost:8000
 ```
 
-Lalu buka browser ke file `nexus-landing.html`.
+Lalu buka browser ke `http://localhost:8000/` (otomatis membuka `index.html`).
 
 ### Kustomisasi Cepat
 
@@ -170,15 +169,14 @@ Lalu buka browser ke file `nexus-landing.html`.
 
 ### GitHub Pages (gratis, 1 menit)
 
-```bash
-# jadikan halaman utama
-cp nexus-landing.html index.html
-git add index.html
-git commit -m "feat: add index.html for GitHub Pages"
-git push origin main
-```
+`index.html` sudah ada di repo, jadi tinggal aktifkan:
 
-Lalu: repo → **Settings → Pages → Deploy from a branch → `main` / `(root)` → Save.**
+1. Buka repo di GitHub → **Settings → Pages**
+2. **Build and deployment → Deploy from a branch**
+3. Branch: **`main` / `(root)` → Save**
+4. Tunggu ±1 menit → live di `https://rizqybelajar8-commits.github.io/3d-site-by-step-AI/`
+
+> Catatan: `index.html` dan `nexus-landing.html` isinya sama. Kalau edit satu, copy ke yang lain supaya sinkron.
 
 ### Vercel / Netlify
 
@@ -189,7 +187,7 @@ Drag & drop folder ini ke [vercel.com](https://vercel.com) atau [netlify.com](ht
 ## 🗺 Roadmap
 
 - [ ] Pisah CSS/JS ke file eksternal (`style.css`, `main.js`)
-- [ ] Tambah `index.html` sebagai entry point utama
+- [x] Tambah `index.html` sebagai entry point utama
 - [ ] Mode terang / gelap (theme toggle)
 - [ ] Integrasi backend waitlist (Formspree / Supabase)
 - [ ] Optimasi performa mobile (kurangi particle count otomatis)
